@@ -1,4 +1,5 @@
 data/
+__pycache__/
 Документация/PlotDezoxidation.ipynb
 Документация/Сборка результатов.*
 
