@@ -69,7 +69,7 @@ def _calculate_and_save_errors(df_logs, df_registry, CONFIG_PREDICTOR):
     # 2. Группируем по cycle_id, но только те строки, где время от 0 до 6 секунд
     # Фильтр накладывается перед groupby
     cycle_errors = df_logs[
-        (df_logs[CONFIG_PREDICTOR['col_time']] >= 6) & (df_logs[CONFIG_PREDICTOR['col_time']] <= 15)
+        (df_logs[CONFIG_PREDICTOR['col_time']] >= 3) & (df_logs[CONFIG_PREDICTOR['col_time']] <= 7)
     ].groupby(CONFIG_PREDICTOR['col_cycle'])[CONFIG_PREDICTOR['col_MAE']].mean()
 
     # 3. Переносим значения из полученной серии в df_registry

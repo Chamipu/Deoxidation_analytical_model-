@@ -123,3 +123,60 @@ class MarkerControl(ttk.Frame):
 
     def get_settings(self):
         return {"visible": self.var_vis.get(), "color": self.var_color.get(), "ls": self.var_ls.get()}
+    
+class PhysicsModelBlock(ttk.LabelFrame):
+    def __init__(self, parent, title, default_config_path, on_change_callback):
+        super().__init__(parent, text=title, padding=10)
+        self.default_path = default_config_path
+        self.on_change = on_change_callback
+        self.sliders = []
+        self.physics_data = {}
+
+        # Кнопки управления именно этим блоком
+        btn_f = ttk.Frame(self)
+        btn_f.pack(fill="x", pady=(0, 5))
+        ttk.Button(btn_f, text="📂", width=3, command=self.load_file).pack(side="left")
+        ttk.Button(btn_f, text="💾", width=3, command=self.save_file).pack(side="left")
+        ttk.Button(btn_f, text="🔄", width=3, command=self.reset).pack(side="left")
+
+        self.container = ttk.Frame(self)
+        self.container.pack(fill="x")
+
+        # Загружаем данные при инициализации
+        self.reset()
+
+    def load_from_dict(self, data):
+        self.physics_data = data
+        for w in self.container.winfo_children(): w.destroy()
+        self.sliders = []
+        for k, v in self.physics_data.items():
+            s = ParamSlider(self.container, k, v, self.on_change)
+            self.sliders.append(s)
+
+    def load_file(self):
+        from tkinter import filedialog
+        from scripts import data_manager as dm
+        path = filedialog.askopenfilename(filetypes=[("JSON", "*.json")])
+        if path:
+            res = dm.load_config(path)
+            if res: self.load_from_dict(res[0])
+
+    def save_file(self):
+        from tkinter import filedialog
+        from scripts import data_manager as dm
+        # Обновляем данные из слайдеров перед сохранением
+        current_params = self.get_params()
+        for k in self.physics_data:
+            self.physics_data[k]["value"] = current_params[k]
+        
+        path = filedialog.asksaveasfilename(defaultextension=".json")
+        if path: dm.save_config(self.physics_data, path)
+
+    def reset(self):
+        from scripts import data_manager as dm
+        res = dm.load_config(self.default_path)
+        if res: self.load_from_dict(res[0])
+
+    def get_params(self):
+        """Возвращает плоский словарь {ключ: значение} для функций расчета"""
+        return {s.key: s.v_val.get() for s in self.sliders}

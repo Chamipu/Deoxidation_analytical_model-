@@ -147,13 +147,18 @@ CONFIG_PREDICTOR_PIPE = {
 # НАСТРОЙКИ ИИНТЕРФЕЙСА И ВИЗУАЛИЗАЦИИ
 # =======================================================================
 
+# графики которые выводятся в интерфейсе
 SENSORS_LIST = [
-    "IBA_DB\PT1009 Актуальное давление в баке P1 (бар)_median",
-    "IBA_DB\PT1014 Актуальное давление в трубе (бар)_median",
-    "LD31W.VALVE 1007 - клапан бака, бар_median",
-    "LD31W.VALVE 1008 - клапан трубы, бар_median",
     "LD31W.Weigh P1 - вес в баке_median",
+    "IBA_DB\PT1009 Актуальное давление в баке P1 (бар)_median",
+    "LD31W.VALVE 1007 - клапан бака, бар_median",
     "p_tank_target",
     "p_tank_theory",
     "p_tank_target_rounded",
+
+    "IBA_DB\PT1014 Актуальное давление в трубе (бар)_median",
+    "LD31W.VALVE 1008 - клапан трубы, бар_median",
+    "p_pipe_target",
+    "p_pipe_theory",
+    "p_pipe_target_rounded",
 ]

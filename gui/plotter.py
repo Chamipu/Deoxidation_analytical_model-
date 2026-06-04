@@ -17,7 +17,7 @@ class Plotter:
 
         # 1. Маркеры
         m_cfg = ui_config.get("markers", {})
-        for sig, key in [("X1213_OPN - клапан порошка откр", "OPN"), ("X1213_CLS - клапан порошка закр", "CLS")]:
+        for sig, key in [("X1213_OPN - клапан порошка откр", "OPN"), ("X1213_CLS - клапан порошка закр_median", "CLS")]:
             c = m_cfg.get(key, {})
             if c.get("visible") and sig in df.columns:
                 for t in df[df[sig] == 1]['t_relative']:

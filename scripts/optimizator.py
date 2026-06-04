@@ -36,7 +36,7 @@ def run_universal_optimizer(df_logs, df_registry, config_full, CONFIG_PREDICTOR,
 
     # 3. НАСТРОЙКИ АЛГОРИТМА (подробнее ниже)
     optimizer_settings = {
-        'popsize': 15,        # Кол-во "особей" на каждый параметр
+        'popsize': 20,        # Кол-во "особей" на каждый параметр
         'maxiter': 40,        # Макс кол-во поколений
         'tol': 0.01,          # Относительная точность для остановки
         'mutation': (0.5, 1), # Степень "разброса" при поиске
