@@ -187,20 +187,20 @@ def _generate_step_profile(t_array, presets, duration, phase_cfg):
 
     return target
 
-def _generate_rounded_target(df_logs, CONFIG_ADD_SETTINGS):
+def _generate_rounded_target(df_logs, CONFIG_GENETATE_TARGET):
 
-    col_target = CONFIG_ADD_SETTINGS['columns']['col_target_tank']
-    col_target_rounded = CONFIG_ADD_SETTINGS['columns']['col_target_tank_rounded']
+    col_target = CONFIG_GENETATE_TARGET['columns']['col_target']
+    col_target_rounded = CONFIG_GENETATE_TARGET['columns']['col_target_rounded']
 
     df_logs[col_target_rounded] = (np.floor(df_logs[col_target] * 0.6))
 
     return df_logs
 
-def apply_target_logic(df_logs, df_registry, df_settings, CONFIG_ADD_SETTINGS):
+def apply_target_logic(df_logs, df_registry, df_settings, CONFIG_GENETATE_TARGET):
     # Инициализация колонок
-    cols = CONFIG_ADD_SETTINGS['columns']
-    df_logs[cols['col_target_tank']] = 0.0
-    df_logs[cols['col_target_pipe']] = 0.0
+    cols = CONFIG_GENETATE_TARGET['columns']
+    prefix = cols['prefix_col']
+    df_logs[cols['col_target']] = 0.0
 
     unique_cycles = df_logs[cols['col_cycle']].unique()
 
@@ -221,8 +221,7 @@ def apply_target_logic(df_logs, df_registry, df_settings, CONFIG_ADD_SETTINGS):
         set_row = settings.iloc[0]
 
         # 3. Подготавливаем данные для ядра
-        pts_tank = [set_row[f'p_tank_preset_{i}'] for i in range(1, 11)]
-        pts_pipe = [set_row[f'p_pipe_preset_{i}'] for i in range(1, 11)]
+        pts = [set_row[f'p{prefix}_preset_{i}'] for i in range(1, 11)]
         duration = float(set_row['Time_cycle']) / 1000.0
 
         # Выделяем временную сетку конкретного цикла
@@ -230,10 +229,9 @@ def apply_target_logic(df_logs, df_registry, df_settings, CONFIG_ADD_SETTINGS):
         t_values = df_logs.loc[mask, cols['col_time']].values
 
         # 4. Вызываем ядро для бака и для трубы
-        df_logs.loc[mask, cols['col_target_tank']] = _generate_step_profile(t_values, pts_tank, duration, CONFIG_ADD_SETTINGS['phases_tank'])
-        df_logs.loc[mask, cols['col_target_pipe']] = _generate_step_profile(t_values, pts_pipe, duration, CONFIG_ADD_SETTINGS['phases_pipe'])
+        df_logs.loc[mask, cols['col_target']] = _generate_step_profile(t_values, pts, duration, CONFIG_GENETATE_TARGET['phases'])
 
-        df_logs = _generate_rounded_target(df_logs, CONFIG_ADD_SETTINGS)
+        df_logs = _generate_rounded_target(df_logs, CONFIG_GENETATE_TARGET)
 
     return df_logs
 

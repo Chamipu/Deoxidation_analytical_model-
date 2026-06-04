@@ -83,12 +83,12 @@ def plot_cycles(df_logs, df_registry, identifiers, sensors, ui_config=None):
     plt.tight_layout()
     # plt.show()
 
-def plot_group_diagnostics(df_logs, df_registry, df_avg_logs, avg_id, sensor, classification_tasks, graf_dir = None, ymax=None, ymin=None):
+def plot_group_diagnostics(df_logs, df_registry, df_avg_logs, avg_id, sensor, CLASSIFICATION_TASKS, GRAF_RESALTS_DIR = None, ymax=None, ymin=None):
     """
     Универсальная диагностика: фильтрует данные по всем колонкам из tasks.
     """
     # 1. Получаем список колонок группировки из конфига
-    group_cols = [t['target_col'] for t in classification_tasks]
+    group_cols = [t['target_col'] for t in CLASSIFICATION_TASKS]
 
     # 2. Выясняем параметры конкретной группы из усредненного датафрейма
     target_row = df_avg_logs[df_avg_logs['cycle_id'] == avg_id].iloc[0]
@@ -130,12 +130,12 @@ def plot_group_diagnostics(df_logs, df_registry, df_avg_logs, avg_id, sensor, cl
 
     plt.ylim(ymin, ymax)
 
-    # plt.savefig(graf_dir / "график.png")
+    # plt.savefig(GRAF_RESALTS_DIR / "график.png")
 
-    if graf_dir:
+    if GRAF_RESALTS_DIR:
         # Формируем имя БЕЗ f-строк внутри replace (чтобы не злить старый Python)
         s_safe = sensor.replace('\\', '_').replace('/', '_')
-        final_path = Path(graf_dir) / f"{avg_id}_{s_safe}.png"
+        final_path = Path(GRAF_RESALTS_DIR) / f"{avg_id}_{s_safe}.png"
         # Сохраняем
         plt.savefig(final_path)
 

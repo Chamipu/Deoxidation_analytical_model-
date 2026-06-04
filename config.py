@@ -1,61 +1,5 @@
 
-# Данный файл является единой точкой управления всеми путями в проекте.
-# =============================================================================
-# =============================================================================
-# ВИЗУАЛЬНАЯ КАРТА ПРОЕКТА (для документации)
-# =============================================================================
-"""
-Структура проекта:
-/ (BASE_DIR)
-├── data/
-│   ├── raw/           <-- Исходные логи (.txt)
-│   ├── processed/     <-- Результаты (logs.csv, registry.csv)
-│   └── config/        <-- Параметры модели (.json)
-├── gui/                <-- Файлы интерфейса
-│   ├── assets/        <-- Картинки и стили
-│   └── layouts/       <-- Разметка окон
-└── config_paths.py    <-- (Этот файл)
-"""
-
-
-# =============================================================================
-# КОНФИГУРАЦИЯ ПУТЕЙ И СТРУКТУРЫ ПРОЕКТА
-# =============================================================================
-from pathlib import Path
-
-# --- 1. КОРНЕВАЯ ДИРЕКТОРИЯ ПРОЕКТА ---
-# Определяет местоположение данного файла и считает его корнем проекта
-BASE_DIR = Path(__file__).resolve().parent
-
-# --- 2. ВХОДНЫЕ ДАННЫЕ (INPUT) ---
-# Место хранения сырых данных, поступающих с производства
-DATA_DIR = BASE_DIR / "data"
-RAW_DATA_DIR = DATA_DIR / "raw"        # Сюда кладем исходные .txt логи
-REFERENCE_SETPOINT_FILE = DATA_DIR / "ТК.20-500.895.1-7.4. ред.0 (настроечные параметры дезоксидации).csv"
-
-# --- 3. РЕЗУЛЬТАТЫ ОБРАБОТКИ (OUTPUT) ---
-# Место хранения очищенных и структурированных данных после экстракции
-PROCESSED_DATA_DIR = DATA_DIR / "processed"
-GRAF_RESALTS_DIR = DATA_DIR / "results"  # Сюда сохраняем графики из интерфейса
-LOGS_FILE     = PROCESSED_DATA_DIR / "cycles_logs.csv"     # Временные ряды (датчики)
-REGISTRY_FILE = PROCESSED_DATA_DIR / "cycles_registry.csv" # Реестр впрысков (метаданные)
-
-LOGS_AVG_FILE     = PROCESSED_DATA_DIR / "cycles_avg_logs.csv"     # Временные ряды (датчики)
-REGISTRY_AVG_FILE = PROCESSED_DATA_DIR / "cycles_avg_registry.csv" # Реестр впрысков (метаданные)
-
-
-# --- 4. НАСТРОЙКИ МОДЕЛИ И КОНФИГУРАЦИЯ (CONFIG) ---
-# Параметры физической модели, коэффициенты и оптимизированные значения
-CONFIG_DIR = DATA_DIR / "config"
-DEFAULT_MODEL_PARAMS_FILE = CONFIG_DIR / "Default_model_params.json"      # Коэффициенты K, T, Zeta...
-VALVE_SETTINGS_FILE = CONFIG_DIR / "valve_reference.csv"  # Таблица настроек ЧМИ
-
-# --- 5. ИНТЕРФЕЙС ПОЛЬЗОВАТЕЛЯ (UI) ---
-# Все файлы, отвечающие за визуализацию и графическую оболочку
-GUI_DIR     = BASE_DIR / "gui"
-GUI_CONFIG_FILE   = CONFIG_DIR / "gui_settings.json"
-# ASSETS_DIR = GUI_DIR / "assets"         # Иконки, логотипы, стили
-# LAYOUT_DIR = GUI_DIR / "layouts"        # Описания окон и графиков
+# Данный файл является единой точкой хранения всех констант и настроек проекта.
 
 # =============================================================================
 # НАСТРОЙКИ ИМПОРТА ДАННЫХ
@@ -113,38 +57,9 @@ EXTRACTION_SETTINGS = {
     "actual_p_col": "IBA_DB\PT1009 Актуальное давление в баке P1 (бар)" # актуальное давление в баке для вычисления ошибки   
 }
 
-    # 5. Список датчиков, которые мы обрабатываются в интерфейсе
-SENSORS_LIST = [
-    "IBA_DB\PT1009 Актуальное давление в баке P1 (бар)_median",
-    "IBA_DB\PT1014 Актуальное давление в трубе (бар)_median",
-    "LD31W.VALVE 1007 - клапан бака, бар_median",
-    "LD31W.VALVE 1008 - клапан трубы, бар_median",
-    "LD31W.Weigh P1 - вес в баке_median",
-    "p_tank_target",
-    "p_tank_theory",
-    "p_tank_target_rounded",
-]
-
-
-
 # =============================================================================
-# НАСТРОЙКИ ИМПОРТА НАСТРОЕК
+# НАСТРОЙКИ ОБРАБОТКИ И ВЫВОДА ДАННЫХ
 # =======================================================================
-
-# Названия колонок в РЕЕСТРЕ (фактические данные из датчиков)
-MATCHING_CONFIG = {
-    # Имена колонок в таблице РЕЕСТРА (фактические данные)
-    "fact_col_dia": "LD11C1\Process Data.BarDiameter (Диаметр заготовки)", 
-    "fact_col_len": "CtpOut002_Shell_length (Длина гильзы)",
-    
-    # Имена колонок в таблице НАСТРОЕК (эталонные)
-    "ref_col_dia": "Dia_Shell",
-    "ref_col_len": "L_Shell",
-    
-    # Допустимые значения (сетка)
-    "dia_bins": [182, 273, 334],
-    "len_bins": [5000, 6000, 7000, 8000, 9000, 10000, 11300],
-}
 
 # Универсальная конфигурация классификации
 CLASSIFICATION_TASKS = [
@@ -168,59 +83,77 @@ CLASSIFICATION_TASKS = [
     # }
 ]
 
-# Все временные границы этапов и названия колонок в одном месте
-CONFIG_ADD_SETTINGS = {
-    'phases_tank': {
+# Параметры генерации заданного сигнала в баке на основе настроек
+CONFIG_GENETATE_TARGET_TANK = {
+    'phases': {
         't_pre_charge': -15.0,  # Начало предварительной надувки
         't_dip_start': -0.3,    # Начало короткого провала перед впрыском
         't_start': 0.0,         # Точка физического старта цикла
     },
 
-    'phases_pipe': {
+    'columns': {
+        'col_cycle': 'cycle_id',
+        'col_time': 't_relative',
+        'prefix_col': '_tank',  
+        'col_target': 'p_tank_target',
+        'col_target_rounded': 'p_tank_target_rounded',   
+    }
+}
+
+# Параметры генерации заданного сигнала в трубе на основе настроек
+CONFIG_GENETATE_TARGET_PIPE = {
+    'phases': {
         't_pre_charge': 0.0,  # Начало предварительной надувки
         't_dip_start': 0.0,    # Начало короткого провала перед впрыском
         't_start': 0.0,         # Точка физического старта цикла
     },
 
     'columns': {
-        'col_time': 't_relative',
         'col_cycle': 'cycle_id',
-        'col_target_tank': 'p_tank_target',
-        'col_target_tank_rounded': 'p_tank_target_rounded',       
-        'col_target_pipe': 'p_pipe_target',
-        'col_result_tank': 'p_tank_theory',
-        'col_MAE_tank': 'MAE_tank',
+        'col_time': 't_relative',
+        'prefix_col': '_pipe',  
+        'col_target': 'p_pipe_target',
+        'col_target_rounded': 'p_pipe_target_rounded',   
     }
 }
 
 # =============================================================================
-# ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+# НАСТРОЙКИ МОДЕЛИ ПРОГНОЗА И ОПТИМИЩАЦИИ
+# =======================================================================
+
+# Параметры модели прогнозирования давления в баке
+CONFIG_PREDICTOR_TANK = {
+    'col_time': 't_relative',
+    'col_cycle': 'cycle_id',
+
+    'col_target': 'p_tank_target_rounded',     # Прогноз по округленному значению
+    # 'col_target_tank': 'p_tank_target',           # Прогноз по значению с пульта
+    'col_result': 'p_tank_theory',
+    'col_MAE': 'MAE_tank',
+}
+
+# Параметры модели прогнозирования давления в трубе
+CONFIG_PREDICTOR_PIPE = {
+    'col_time': 't_relative',
+    'col_cycle': 'cycle_id',
+
+    'col_target': 'p_pipe_target_rounded',     # Прогноз по округленному значению
+    # 'col_target_pipe': 'p_pipe_target',             # Прогноз по значению с пульта
+    'col_result': 'p_pipe_theory',
+    'col_MAE': 'MAE_pipe',
+}
+
 # =============================================================================
+# НАСТРОЙКИ ИИНТЕРФЕЙСА И ВИЗУАЛИЗАЦИИ
+# =======================================================================
 
-def init_structure():
-    """
-    Создает все необходимые папки проекта, если они отсутствуют.
-    Вызывается один раз при старте приложения.
-    """
-    folders = [
-        RAW_DATA_DIR, 
-        PROCESSED_DATA_DIR, 
-        CONFIG_DIR, 
-        GUI_DIR, 
-        # ASSETS_DIR, 
-        # LAYOUT_DIR
-    ]
-    
-    print("--- Проверка структуры проекта ---")
-    for folder in folders:
-        if not folder.exists():
-            folder.mkdir(parents=True, exist_ok=True)
-            print(f"[СОЗДАНО] {folder.relative_to(BASE_DIR)}")
-        else:
-            print(f"[OK] {folder.relative_to(BASE_DIR)}")
-    print("----------------------------------\n")
-
-
-if __name__ == "__main__":
-    # При запуске файла напрямую — просто создаем структуру
-    init_structure()
+SENSORS_LIST = [
+    "IBA_DB\PT1009 Актуальное давление в баке P1 (бар)_median",
+    "IBA_DB\PT1014 Актуальное давление в трубе (бар)_median",
+    "LD31W.VALVE 1007 - клапан бака, бар_median",
+    "LD31W.VALVE 1008 - клапан трубы, бар_median",
+    "LD31W.Weigh P1 - вес в баке_median",
+    "p_tank_target",
+    "p_tank_theory",
+    "p_tank_target_rounded",
+]

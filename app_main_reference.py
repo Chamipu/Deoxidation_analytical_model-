@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# app_main_reference.py - основной файл приложения для анализа и настройки пневматической системы на основе эталонной модели давления в баке.
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import pandas as pd
@@ -7,6 +8,8 @@ import matplotlib.pyplot as plt
 
 # Импорт конфигурации
 import config as cnfg
+import config_paths as cnfg_p
+
 
 # Импорт рабочих модулей
 from scripts import import_data as idt
@@ -28,13 +31,16 @@ class PneumaticTunerApp:
         self.root.protocol("WM_DELETE_WINDOW", self.on_exit)
 
         # --- КОНФИГУРАЦИЯ ПУТЕЙ (из config.py) ---
-        self.LOGS_FILE = cnfg.LOGS_AVG_FILE
-        self.REGISTRY_FILE = cnfg.REGISTRY_AVG_FILE
-        self.DEFAULT_MODEL_PARAMS_FILE = cnfg.DEFAULT_MODEL_PARAMS_FILE
-        self.GUI_CONFIG_FILE = cnfg.GUI_CONFIG_FILE # Путь к JSON настройкам UI
-        self.REFERENCE_SETPOINT_FILE = cnfg.REFERENCE_SETPOINT_FILE
+        self.LOGS_FILE = cnfg_p.LOGS_AVG_FILE
+        self.REGISTRY_FILE = cnfg_p.REGISTRY_AVG_FILE
+        self.DEFAULT_MODEL_PARAMS_FILE = cnfg_p.DEFAULT_MODEL_PARAMS_FILE
+        self.GUI_CONFIG_FILE = cnfg_p.GUI_CONFIG_FILE # Путь к JSON настройкам UI
+        self.REFERENCE_SETPOINT_FILE = cnfg_p.REFERENCE_SETPOINT_FILE
         
-        self.CONFIG_ADD_SETTINGS = cnfg.CONFIG_ADD_SETTINGS
+        self.CONFIG_GENETATE_TARGET_TANK = cnfg.CONFIG_GENETATE_TARGET_TANK
+        self.CONFIG_GENETATE_TARGET_PIPE = cnfg.CONFIG_GENETATE_TARGET_PIPE
+        self.CONFIG_PREDICTOR_TANK = cnfg.CONFIG_PREDICTOR_TANK
+        self.CONFIG_PREDICTOR_PIPE = cnfg.CONFIG_PREDICTOR_PIPE 
 
         # Список датчиков из конфига (динамические данные)
         self.SENSORS_LIST = cnfg.SENSORS_LIST
@@ -235,7 +241,7 @@ class PneumaticTunerApp:
         self.df_logs, self.df_registry = prm.apply_analytic_model(
             self.df_logs, 
             self.df_registry,
-            self.CONFIG_ADD_SETTINGS['columns'], 
+            self.CONFIG_PREDICTOR_TANK, 
             p_flat
         )
 

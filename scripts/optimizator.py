@@ -2,7 +2,7 @@ from scipy.optimize import differential_evolution
 import time
 from scripts import pressure_predictor_lite as prm
 
-def run_universal_optimizer(df_logs, df_registry, config_full, model_config, param_keys):
+def run_universal_optimizer(df_logs, df_registry, config_full, CONFIG_PREDICTOR, param_keys):
     """
     param_keys: список строк, например ["dead_time", "k_gain", "b_gain", "damping"]
     config_full: ваш словарь с min, max, value
@@ -25,12 +25,12 @@ def run_universal_optimizer(df_logs, df_registry, config_full, model_config, par
         _, temp_registry = prm.apply_analytic_model(
             df_logs.copy(), 
             df_registry.copy(), 
-            model_config, 
+            CONFIG_PREDICTOR, 
             current_params
         )
         
         # 3. Просто берем среднее значение ошибки из колонки, которую создала функция
-        score = temp_registry[model_config['col_MAE_tank']].mean()
+        score = temp_registry[CONFIG_PREDICTOR['col_MAE']].mean()
         
         return score
 
