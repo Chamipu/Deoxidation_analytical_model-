@@ -1,6 +1,6 @@
 from scipy.optimize import differential_evolution
 import time
-from scripts import pressure_predictor_lite as prm
+from scripts.independent_linear_predictor import pressure_predictor_lite as prm
 
 def run_universal_optimizer(df_logs, df_registry, config_full, CONFIG_PREDICTOR, param_keys):
     """

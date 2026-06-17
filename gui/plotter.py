@@ -10,6 +10,7 @@ class Plotter:
         self.canvas.get_tk_widget().pack(fill="both", expand=True)
         self.toolbar = NavigationToolbar2Tk(self.canvas, parent)
 
+
     def draw(self, df, ui_config, cycle_label):
         self.ax.clear(); self.ax2.clear()
         if df is None or df.empty:
@@ -28,9 +29,10 @@ class Plotter:
         for s, settings in s_cfg.items():
             if settings.get("visible") and s in df.columns:
                 ax = self.ax2 if "Weigh" in s else self.ax
+                # Срез [:15] удален для вывода полного названия датчика в легенде
                 ax.plot(df['t_relative'], df[s] * settings.get("scale", 1.0),
                         color=settings.get("color"), ls=settings.get("ls"),
-                        label=s.split('\\')[-1][:15], lw=1.5)
+                        label=s.split('\\')[-1], lw=1.5)
 
         # 3. Оси
         lims = ui_config.get("axis_limits", {})

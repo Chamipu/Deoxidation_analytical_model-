@@ -43,6 +43,8 @@ COLUMNS_CONFIG = {
         "63: Tube diameter at FQT outlet",
         "IBA_DB\PT1009 Актуальное давление в баке P1 (бар)",
         "IBA_DB\PT1014 Актуальное давление в трубе (бар)",
+        "LD31W.VALVE 1007 - клапан бака, бар",
+        "LD31W.VALVE 1008 - клапан трубы, бар",
     ]
 }
 
@@ -84,10 +86,10 @@ CLASSIFICATION_TASKS = [
 ]
 
 # Параметры генерации заданного сигнала в баке на основе настроек
-CONFIG_GENETATE_TARGET_TANK = {
+CONFIG_GENERATE_TARGET_TANK = {
     'phases': {
         't_pre_charge': -15.0,  # Начало предварительной надувки
-        't_dip_start': -0.3,    # Начало короткого провала перед впрыском
+        't_dip_start': -0.4,    # Начало короткого провала перед впрыском
         't_start': 0.0,         # Точка физического старта цикла
     },
 
@@ -101,7 +103,7 @@ CONFIG_GENETATE_TARGET_TANK = {
 }
 
 # Параметры генерации заданного сигнала в трубе на основе настроек
-CONFIG_GENETATE_TARGET_PIPE = {
+CONFIG_GENERATE_TARGET_PIPE = {
     'phases': {
         't_pre_charge': 0.0,  # Начало предварительной надувки
         't_dip_start': 0.0,    # Начало короткого провала перед впрыском

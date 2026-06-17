@@ -4,6 +4,7 @@ from tkinter import ttk
 import config_paths as cnfg_p
 from scripts import data_manager as dm
 from gui.tabs.sim_tab import SimulationTab
+from gui.tabs.optimization_tab import OptimizationTab
 
 class AppState:
     def __init__(self):
@@ -22,7 +23,9 @@ class MainWindow:
         
         self.sim_tab = SimulationTab(nb, self.state)
         nb.add(self.sim_tab, text=" Моделирование ")
-        # nb.add(ttk.Frame(), text=" Оптимизация (WIP) ")
+        
+        self.optimization_tab = OptimizationTab(nb, self.state)
+        nb.add(self.optimization_tab, text=" Оптимизация (WIP) ")
         
         self.root.state('zoomed')
 

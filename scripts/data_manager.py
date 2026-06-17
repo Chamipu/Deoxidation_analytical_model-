@@ -1,3 +1,4 @@
+# data_manager.py файл для работы с данными: загрузка, сохранение, обработка, генерация уставок и усреднение профилей.
 # -*- coding: utf-8 -*-
 import pandas as pd
 import os
@@ -65,7 +66,7 @@ def remove_cycles_from_data(df_logs, df_registry, cycle_ids, col_cycle='cycle_id
 
 def update_label_by_time(df_registry, start_time_str, label, csv_path=None):
     """
-    ВАЖНО: Теперь работает с df_registryistry (где 1 цикл = 1 строка).
+    ВАЖНО: Теперь работает с df_registry (где 1 цикл = 1 строка).
     Обновляет тег 'case_tag' для конкретного впрыска.
     """
     if df_registry is None: return None
@@ -137,57 +138,62 @@ def get_summary(df, only_labeled=False):
 # БЛОК: ГЕНЕРАЦИЯ ЗАДАННОГО ЗНАЧЕНИЯ (УСТАВКИ) НА ОСНОВЕ МЕТАДАННЫХ И НАСТРОЕК
 # =============================================================================
 
-# def _generate_step_profile(t_array, presets, duration, phase_cfg):
-#     """Рассчитывает уставку для массива времени согласно этапам с интерполяцией между циклами."""
+import numpy as np
 
-#     target = np.zeros_like(t_array)
-#     # Этап 1: Надувка бака (до провала)
-#     mask_prep = (t_array >= phase_cfg['t_pre_charge']) & (t_array < phase_cfg['t_dip_start'])
-#     target[mask_prep] = presets[0]
+def calculate_smooth_strategy(t_active, presets, duration, t_start):
+    """Расчет заданного профиля давления с помощью сглаживающего сплайна"""
+    from scipy.interpolate import UnivariateSpline
+    active_end_time = t_start + duration
+    x_active_phases = np.linspace(t_start, active_end_time, len(presets))
     
-#     # Этап 2: Провал (между t_dip_start и t_start)
-#     # Оставляем нулем (np.zeros_like уже сделал это)
+    smoothing_spline = UnivariateSpline(x_active_phases, presets, s=1.0)
+    return smoothing_spline(t_active)
+
+
+def calculate_step_strategy(t_active, presets, duration, t_start):
+    """Расчет ступенек для входного сигнала на основе пресетов"""
+    x_phases = np.linspace(0, duration, len(presets))
+    local_t = t_active - t_start
     
-#     # Этап 3: Активный цикл (интерполяция 10 точек)
-#     mask_cycle = (t_array >= phase_cfg['t_start']) & (t_array <= duration)
-#     x_phases = np.linspace(0, duration, 10)
-#     target[mask_cycle] = np.interp(t_array[mask_cycle], x_phases, presets)
+    indices = np.digitize(local_t, x_phases) - 1
+    indices = np.clip(indices, 0, len(presets) - 1)
+    return np.array(presets)[indices]
 
-#     return target
-
-def _generate_step_profile(t_array, presets, duration, phase_cfg):
-    """Рассчитывает уставку в виде ступенчатого графика."""
+def generate_step_profile(t_array, presets, duration, phases, active_phase_calculator):
+    """
+    Рассчитывает уставку давления на заданной временной сетке t_array.
+    Возвращает чистый массив np.ndarray такого же размера.
+    """
+    t_pre_charge = phases['t_pre_charge']
+    t_dip_start = phases['t_dip_start']
+    t_start = phases['t_start']
+    active_end_time = t_start + duration
 
     target = np.zeros_like(t_array)
-    
-    # Этап 1: Надувка бака (постоянное значение)
-    mask_prep = (t_array >= phase_cfg['t_pre_charge']) & (t_array < phase_cfg['t_dip_start'])
+
+    # 1. Преднадув
+    mask_prep = (t_array >= t_pre_charge) & (t_array < t_dip_start)
     target[mask_prep] = presets[0]
-    
-    # Этап 2: Провал (нули) - пропускаем
-    
-    # Этап 3: Активный цикл (СТУПЕНЬКИ)
-    mask_cycle = (t_array >= phase_cfg['t_start']) & (t_array <= duration)
+
+    # 2. Активная фаза (делегирование стратегии)
+    mask_cycle = (t_array >= t_start) & (t_array <= active_end_time)
     
     if np.any(mask_cycle):
-        # 1. Создаем границы 10 временных интервалов (как и раньше)
-        x_phases = np.linspace(0, duration, 10)
-        
-        # 2. Для каждого момента t находим, в какой интервал (индекс) он попал
-        # np.digitize возвращает индекс интервала от 1 до 10
-        # Вычитаем 1, чтобы получить индекс массива presets от 0 до 9
-        local_t = t_array[mask_cycle] - phase_cfg['t_start']
-        indices = np.digitize(local_t, x_phases) - 1
-        
-        # 3. Ограничиваем индекс сверху (на случай, если t ровно равно duration)
-        indices = np.clip(indices, 0, len(presets) - 1)
-        
-        # 4. Присваиваем значения из пресетов по индексам
-        target[mask_cycle] = np.array(presets)[indices]
+        t_active = t_array[mask_cycle]
+        target[mask_cycle] = active_phase_calculator(
+            t_active=t_active, 
+            presets=presets, 
+            duration=duration, 
+            t_start=t_start
+        )
 
     return target
 
 def _generate_rounded_target(df_logs, CONFIG_GENETATE_TARGET):
+    """
+    Масштабирует целевое давление (умножением на 0.6) и округляет его вниз до целого.
+    Используется для имитации дискретных шагов уставки в физическом контроллере (ПЛК).
+    """
 
     col_target = CONFIG_GENETATE_TARGET['columns']['col_target']
     col_target_rounded = CONFIG_GENETATE_TARGET['columns']['col_target_rounded']
@@ -229,7 +235,12 @@ def apply_target_logic(df_logs, df_registry, df_settings, CONFIG_GENETATE_TARGET
         t_values = df_logs.loc[mask, cols['col_time']].values
 
         # 4. Вызываем ядро для бака и для трубы
-        df_logs.loc[mask, cols['col_target']] = _generate_step_profile(t_values, pts, duration, CONFIG_GENETATE_TARGET['phases'])
+        df_logs.loc[mask, cols['col_target']] = generate_step_profile(
+            t_values, 
+            pts, 
+            duration, 
+            CONFIG_GENETATE_TARGET['phases'],
+            calculate_step_strategy)
 
         df_logs = _generate_rounded_target(df_logs, CONFIG_GENETATE_TARGET)
 

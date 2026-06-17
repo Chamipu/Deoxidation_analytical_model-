@@ -42,6 +42,15 @@ def _extract_cycles(df, filename, settings, ts_cols, reg_cols):
                 
                 # Реестр
                 reg_entry = df.loc[start_idx, reg_cols].to_dict()
+                
+                # --- ИЗМЕНЕНИЕ: Сдвиг на 20 строк назад (4 секунды при шаге 0.2с) ---
+                target_col = "LD31W.VALVE 1007 - клапан бака, бар"
+                if target_col in reg_entry:
+                    # Ограничиваем снизу нулем, чтобы не выйти за пределы начала датафрейма
+                    idx_4s = max(0, start_idx - 20)
+                    reg_entry[target_col] = df.loc[idx_4s, target_col]
+                # ------------------------------------------------------------------
+                
                 reg_entry.update({"cycle_id": c_id, "cycle_start_time": t_start, "duration": duration})
                 detected_reg.append(reg_entry)
                 
@@ -57,6 +66,46 @@ def _extract_cycles(df, filename, settings, ts_cols, reg_cols):
                 detected_ts.append(cycle_slice[cols_to_keep])
                 
     return detected_ts, detected_reg
+
+# def _extract_cycles(df, filename, settings, ts_cols, reg_cols):
+#     """
+#     settings: словарь с триггерами
+#     ts_cols, reg_cols: списки колонок
+#     """
+#     detected_ts, detected_reg = [], []
+#     t_open = settings['trigger_open']
+#     t_close = settings['trigger_close']
+#     time_col = settings['time_col']
+
+#     starts = df.index[(df[t_open].shift(1) == 0) & (df[t_open] == 1)].tolist()
+    
+#     for start_idx in starts:
+#         t_start = df.loc[start_idx, time_col]
+#         future_data = df.loc[start_idx : start_idx + 2000]
+#         closes = future_data.index[(future_data[t_close].shift(1) == 0) & (future_data[t_close] == 1)].tolist()
+        
+#         if closes:
+#             duration = (df.loc[closes[0], time_col] - t_start).total_seconds()
+#             if 0 < duration <= settings["MAX_ALLOWED_DURATION"]:
+#                 c_id = f"{filename}_{t_start.strftime('%Y%m%d_%H%M%S')}"
+                
+#                 # Реестр
+#                 reg_entry = df.loc[start_idx, reg_cols].to_dict()
+#                 reg_entry.update({"cycle_id": c_id, "cycle_start_time": t_start, "duration": duration})
+#                 detected_reg.append(reg_entry)
+                
+#                 # Логи
+#                 mask = (df[time_col] >= t_start - timedelta(seconds=settings['t_before'])) & \
+#                        (df[time_col] <= t_start + timedelta(seconds=settings['t_after']))
+                
+#                 cycle_slice = df.loc[mask].copy()
+#                 cycle_slice['t_relative'] = (cycle_slice[time_col] - t_start).dt.total_seconds()
+#                 cycle_slice['cycle_id'] = c_id
+                
+#                 cols_to_keep = ["cycle_id", "t_relative"] + [c for c in ts_cols if c in cycle_slice.columns]
+#                 detected_ts.append(cycle_slice[cols_to_keep])
+                
+#     return detected_ts, detected_reg
 
 def run_extraction(raw_dir, logs_file, reg_file, settings, col_config):
     """

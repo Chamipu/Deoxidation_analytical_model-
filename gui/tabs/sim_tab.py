@@ -6,13 +6,15 @@ import config_paths as cnfg_p
 from gui.widgets import SensorControl, MarkerControl, PhysicsModelBlock
 from gui.plotter import Plotter
 from scripts import data_manager as dm
-from scripts import pressure_predictor_lite as prm
+from scripts.independent_linear_predictor import pressure_predictor_lite as prm
 
 class SimulationTab(ttk.Frame):
     def __init__(self, parent, state):
         super().__init__(parent)
         self.state = state
         self._setup_layout()
+        self.update_view()  # Принудительное обновление графика при запуске приложения
+
 
     def _setup_layout(self):
         paned = ttk.PanedWindow(self, orient="horizontal")
@@ -22,11 +24,22 @@ class SimulationTab(ttk.Frame):
         self.left_f = ttk.Frame(paned, padding=5)
         paned.add(self.left_f, weight=1)
 
-        # 1. Выбор цикла
+        # 1. Выбор цикла со стрелочками переключения
+        cycle_frame = ttk.Frame(self.left_f)
+        cycle_frame.pack(fill="x", pady=5)
+
         labels = self.state.df_registry['cycle_id'].dropna().unique().tolist()
         self.cycle_var = tk.StringVar(value=labels[-1] if labels else "")
-        cb = ttk.Combobox(self.left_f, textvariable=self.cycle_var, values=labels, state="readonly")
-        cb.pack(fill="x", pady=5); cb.bind("<<ComboboxSelected>>", lambda e: self.update_view())
+
+        btn_prev = ttk.Button(cycle_frame, text="◀", width=3, command=self._prev_cycle)
+        btn_prev.pack(side="left", padx=(0, 2))
+
+        cb = ttk.Combobox(cycle_frame, textvariable=self.cycle_var, values=labels, state="readonly")
+        cb.pack(side="left", fill="x", expand=True)
+        cb.bind("<<ComboboxSelected>>", lambda e: self.update_view())
+
+        btn_next = ttk.Button(cycle_frame, text="▶", width=3, command=self._next_cycle)
+        btn_next.pack(side="left", padx=(2, 0))
 
         # 2. Область прокрутки для параметров
         canvas = tk.Canvas(self.left_f)
@@ -59,18 +72,26 @@ class SimulationTab(ttk.Frame):
         self.sensor_ctrls = [SensorControl(self.scroll_f, s, self.state.gui_config["sensors"].get(s, {}), self.update_view) 
                             for s in cnfg.SENSORS_LIST]
 
-        # Оси (в самом низу сайдбара, не в скролле)
-        ttk.Label(self.left_f, text="ОСИ (Мин/Макс/Фикс):", font=('Arial', 9, 'bold')).pack(anchor="w", pady=(10,5))
+        # Оси (перемещены в scroll_f под блок датчиков)
+        ttk.Label(self.scroll_f, text="ОСИ (Мин/Макс/Фикс):", font=('Arial', 9, 'bold')).pack(anchor="w", pady=(15,5))
         self.axis_ui = {}
         for ax_id, label in [("x", "Время"), ("y1", "Давление"), ("y2", "Вес")]:
-            f = ttk.Frame(self.left_f)
-            f.pack(fill="x")
+            f = ttk.Frame(self.scroll_f)
+            f.pack(fill="x", pady=2)
             ttk.Label(f, text=label, width=10).pack(side="left")
             lims = self.state.gui_config["axis_limits"]
-            v_min, v_max, v_fix = tk.StringVar(value=lims[f"{ax_id}_min"]), tk.StringVar(value=lims[f"{ax_id}_max"]), tk.BooleanVar(value=lims[f"{ax_id}_fix"])
-            ttk.Entry(f, textvariable=v_min, width=7).pack(side="left")
-            ttk.Entry(f, textvariable=v_max, width=7).pack(side="left")
-            ttk.Checkbutton(f, variable=v_fix, command=self.update_view).pack(side="left")
+            
+            v_min = tk.StringVar(value=str(lims[f"{ax_id}_min"]))
+            v_max = tk.StringVar(value=str(lims[f"{ax_id}_max"]))
+            v_fix = tk.BooleanVar(value=lims[f"{ax_id}_fix"])
+            
+            # Трассировка изменений полей ввода для автоматического обновления графика в процессе ввода
+            v_min.trace_add("write", lambda *args: self.update_view())
+            v_max.trace_add("write", lambda *args: self.update_view())
+            
+            ttk.Entry(f, textvariable=v_min, width=7).pack(side="left", padx=2)
+            ttk.Entry(f, textvariable=v_max, width=7).pack(side="left", padx=2)
+            ttk.Checkbutton(f, variable=v_fix, command=self.update_view).pack(side="left", padx=5)
             self.axis_ui[ax_id] = {"min": v_min, "max": v_max, "fix": v_fix}
 
         # --- ПРАВАЯ ЧАСТЬ (ГРАФИК) ---
@@ -107,3 +128,25 @@ class SimulationTab(ttk.Frame):
         df_curr = self.state.df_logs[self.state.df_logs['cycle_id'] == cid]
         self.plotter.draw(df_curr, self.state.gui_config, cid)
         dm.save_ui_config(self.state.gui_config, cnfg_p.GUI_CONFIG_FILE)
+
+    def _prev_cycle(self):
+        """Переключение на предыдущий цикл в списке"""
+        labels = self.state.df_registry['cycle_id'].dropna().unique().tolist()
+        if not labels: return
+        current = self.cycle_var.get()
+        if current in labels:
+            idx = labels.index(current)
+            new_idx = max(0, idx - 1)
+            self.cycle_var.set(labels[new_idx])
+            self.update_view()
+
+    def _next_cycle(self):
+        """Переключение на следующий цикл в списке"""
+        labels = self.state.df_registry['cycle_id'].dropna().unique().tolist()
+        if not labels: return
+        current = self.cycle_var.get()
+        if current in labels:
+            idx = labels.index(current)
+            new_idx = min(len(labels) - 1, idx + 1)
+            self.cycle_var.set(labels[new_idx])
+            self.update_view()
