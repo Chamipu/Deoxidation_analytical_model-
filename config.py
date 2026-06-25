@@ -123,12 +123,14 @@ CONFIG_GENERATE_TARGET_PIPE = {
 # НАСТРОЙКИ МОДЕЛИ ПРОГНОЗА И ОПТИМИЩАЦИИ
 # =======================================================================
 
+DEFAULT_DT: float = 0.2
+
 # Параметры модели прогнозирования давления в баке
 CONFIG_PREDICTOR_TANK = {
     'col_time': 't_relative',
     'col_cycle': 'cycle_id',
 
-    'col_target': 'p_tank_target_rounded',     # Прогноз по округленному значению
+    'col_target': 'p_tank_target_rounded',          # Прогноз по округленному значению
     # 'col_target_tank': 'p_tank_target',           # Прогноз по значению с пульта
     'col_result': 'p_tank_theory',
     'col_MAE': 'MAE_tank',
@@ -139,8 +141,8 @@ CONFIG_PREDICTOR_PIPE = {
     'col_time': 't_relative',
     'col_cycle': 'cycle_id',
 
-    'col_target': 'p_pipe_target_rounded',     # Прогноз по округленному значению
-    # 'col_target_pipe': 'p_pipe_target',             # Прогноз по значению с пульта
+    'col_target': 'p_pipe_target_rounded',          # Прогноз по округленному значению
+    # 'col_target_pipe': 'p_pipe_target',           # Прогноз по значению с пульта
     'col_result': 'p_pipe_theory',
     'col_MAE': 'MAE_pipe',
 }

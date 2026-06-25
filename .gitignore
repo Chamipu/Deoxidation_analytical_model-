@@ -1,7 +1,9 @@
 data/
-__pycache__/
-scripts/__pycache__/
-gui/__pycache__/
+# Python кэш
+**/__pycache__/
+*.pyc
+*.pyo
+
 Документация/PlotDezoxidation.ipynb
 Документация/Сборка результатов.*
 

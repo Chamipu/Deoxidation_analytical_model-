@@ -3,50 +3,90 @@ import pandas as pd
 from scripts.independent_linear_predictor import pressure_predictor_lite as prm
 from scripts import data_manager as dm
 from scripts.independent_linear_predictor import invers_optimizator as iopt
+
+SIMULATION_DT = 0.2
+TIME_GRID_START = -20.0
+TIME_GRID_END = 20.0
+
 # =============================================================================
-# БЛОК1: ГЕНЕРАЦИЯ СИНТЕТИЧЕСКОЙ СРЕДЫ И РАСЧЕТ ЦЕЛЕВОГО ГРАФИКА
+# ПУБЛИЧНЫЙ API (GUI, ноутбуки)
 # =============================================================================
+
+def make_time_grid(dt=SIMULATION_DT):
+    """Единая временная сетка для синтетических расчётов."""
+    return np.arange(TIME_GRID_START, TIME_GRID_END + dt, dt)
+
+
+def build_goal_profile_preview(presets, injection_duration, phases):
+    """
+    Строит желаемый сглаженный профиль без оптимизации.
+    Возвращает time_grid, goal_pressure_raw и координаты опорных точек по времени.
+    """
+    time_grid, goal_pressure_raw, df_registry = _init_synthetic_profile(
+        presets, injection_duration, phases
+    )
+    return time_grid, goal_pressure_raw, df_registry['goal_time'].values
+
+
+def run_preset_optimization(presets, injection_duration, flat_params, phases):
+    """
+    Полный пайплайн подбора уставок ПЛК: цель → инерция бака → DE-оптимизация → прогноз.
+    Возвращает словарь с массивами для отрисовки и списком best_presets (% пульта).
+    """
+    time_grid, goal_pressure_raw, df_registry = _init_synthetic_profile(
+        presets, injection_duration, phases
+    )
+    goal_pressure = _simulate_tank_dynamics(
+        time_grid, goal_pressure_raw, injection_duration, flat_params
+    )
+    best_presets = iopt.optimize_presets(
+        time_grid,
+        goal_pressure,
+        phases,
+        flat_params,
+        eval_window=(0.0, injection_duration),
+        injection_duration=injection_duration,
+    )
+    target_profile = _build_plc_target_profile(
+        time_grid, best_presets, injection_duration, phases
+    )
+    prediction = prm.analitic_model(time_grid, target_profile, flat_params)
+
+    return {
+        "time_grid": time_grid,
+        "goal_raw": goal_pressure_raw,
+        "goal_pressure": goal_pressure,
+        "best_presets": best_presets,
+        "target": target_profile,
+        "prediction": prediction,
+        "preset_times": df_registry['goal_time'].values,
+    }
+
 
 def generate_base_logs_df(presets, injection_duration, CONFIG_GENERATE_TARGET, flat_params):
     """
     Главный оркестратор: генерирует синтетическую среду, рассчитывает переходные процессы,
     подбирает настройки управления (пресеты) и формирует финальный отчет.
     """
-    # Шаг 1: Инициализация временной шкалы и идеального задания
-    time_grid, goal_pressure_raw, df_registry = _init_synthetic_profile(
-        presets, injection_duration, CONFIG_GENERATE_TARGET['phases']
-    )
+    phases = CONFIG_GENERATE_TARGET['phases']
+    result = run_preset_optimization(presets, injection_duration, flat_params, phases)
 
-    # Шаг 2: Симуляция динамики бака (инерция преднадува и провала)
-    goal_pressure = _simulate_tank_dynamics(
-        time_grid, goal_pressure_raw, injection_duration, flat_params
-    )
-
-    # Шаг 3: Оптимизация ПЛК и построение прогноза для активной фазы
-    # goal_preset, p_predicted_active = _optimize_and_predict_active_phase(
-    #     time_grid, goal_pressure_raw, injection_duration, flat_params
-    # )
-
-    goal_preset = iopt.optimize_presets(
-        time_grid, 
-        goal_pressure, 
-        CONFIG_GENERATE_TARGET['phases'], 
-        flat_params, 
-        eval_window=(0.0, 6.0), 
-        injection_duration=6.0
-    )
-
-
-    # Шаг 4: Сборка результатов в финальный DataFrame логов
     df_logs = _assemble_final_dataframe(
-        time_grid, 
-        goal_pressure_raw, 
-        goal_pressure, 
-        injection_duration, 
-        CONFIG_GENERATE_TARGET
+        result["time_grid"],
+        result["goal_raw"],
+        result["goal_pressure"],
+        injection_duration,
+        CONFIG_GENERATE_TARGET,
     )
+    df_registry = pd.DataFrame({
+        'goal_time': result["preset_times"],
+        'goal_pressure_presets': presets,
+    })
+    return df_logs, df_registry, result["best_presets"]
 
-    return df_logs, df_registry, goal_preset
+# =============================================================================
+# БЛОК1: ГЕНЕРАЦИЯ СИНТЕТИЧЕСКОЙ СРЕДЫ И РАСЧЕТ ЦЕЛЕВОГО ГРАФИКА
+# =============================================================================
 
 # ШАГ 1: Инициализация временной шкалы и идеального задания
 # =============================================================================
@@ -64,8 +104,7 @@ def _init_synthetic_profile(presets, injection_duration, phases):
         goal_pressure_raw (np.ndarray): Идеальный целевой график.
         df_registry (pd.DataFrame): Таблица меток для графиков.
     """
-    dt = 0.2
-    time_grid = np.arange(-20.0, 20.0 + dt, dt)
+    time_grid = make_time_grid()
     
     # Расчет уставки по новой универсальной функции
     goal_pressure_raw = dm.generate_step_profile(
@@ -100,7 +139,7 @@ def _simulate_tank_dynamics(time_grid, goal_pressure_raw, injection_duration, fl
     Возвращает:
         goal_pressure (np.ndarray): Сглаженный физический график давления.
     """
-    dt = 0.2
+    dt = SIMULATION_DT
     goal_pressure = np.zeros_like(time_grid)
     damping = flat_params['damping']
     k_gain, b_gain = 0.1, 1  # Базовые коэффициенты ПЛК
@@ -122,7 +161,18 @@ def _simulate_tank_dynamics(time_grid, goal_pressure_raw, injection_duration, fl
 
     return goal_pressure
 
-# Шаг 3: Оптимизация ПЛК и построение прогноза для активной фазы
+def _build_plc_target_profile(time_grid, best_presets_percent, injection_duration, phases):
+    """Переводит проценты пульта в уставки ПЛК и строит ступенчатый профиль."""
+    goal_set_plc = np.floor(np.array(best_presets_percent) * 0.6)
+    return dm.generate_step_profile(
+        time_grid,
+        goal_set_plc,
+        injection_duration,
+        phases,
+        dm.calculate_step_strategy,
+    )
+
+# Шаг 3: Оптимизация ПЛК и построение прогноза для активной фазы (greedy, legacy)
 # =============================================================================
 
 def _optimize_and_predict_active_phase(time_grid, goal_pressure, injection_duration, flat_params):

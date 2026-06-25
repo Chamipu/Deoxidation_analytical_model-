@@ -7,6 +7,7 @@ from gui.widgets import SensorControl, MarkerControl, PhysicsModelBlock
 from gui.plotter import Plotter
 from scripts import data_manager as dm
 from scripts.independent_linear_predictor import pressure_predictor_lite as prm
+from scripts import model_manager as mm
 
 class SimulationTab(ttk.Frame):
     def __init__(self, parent, state):
@@ -110,17 +111,30 @@ class SimulationTab(ttk.Frame):
         # 2. Синхронизация маркеров и датчиков
         self.state.gui_config["markers"] = {k: v.get_settings() for k, v in self.marker_ctrls.items()}
         for sc in self.sensor_ctrls: self.state.gui_config["sensors"][sc.sensor_name] = sc.get_settings()
-        
+
+        # # 3. РАСЧЕТ МОДЕЛЕЙ
+        # # Прогноз БАКА
+        # self.state.df_logs, _ = prm.apply_analytic_model(
+        #     self.state.df_logs, self.state.df_registry, 
+        #     cnfg.CONFIG_PREDICTOR_TANK, self.tank_model.get_params()
+        # )
+        # # Прогноз ТРУБЫ
+        # self.state.df_logs, _ = prm.apply_analytic_model(
+        #     self.state.df_logs, self.state.df_registry, 
+        #     cnfg.CONFIG_PREDICTOR_PIPE, self.pipe_model.get_params()
+        # )
+
         # 3. РАСЧЕТ МОДЕЛЕЙ
-        # Прогноз БАКА
-        self.state.df_logs, _ = prm.apply_analytic_model(
-            self.state.df_logs, self.state.df_registry, 
-            cnfg.CONFIG_PREDICTOR_TANK, self.tank_model.get_params()
-        )
-        # Прогноз ТРУБЫ
-        self.state.df_logs, _ = prm.apply_analytic_model(
-            self.state.df_logs, self.state.df_registry, 
-            cnfg.CONFIG_PREDICTOR_PIPE, self.pipe_model.get_params()
+        # Apply predictor: 'independent' (legacy) or 'coupled'.
+        predictor_choice = self.state.gui_config.get("predictor", "independent")
+        self.state.df_logs, self.state.df_registry = mm.apply_model(
+            self.state.df_logs,
+            self.state.df_registry,
+            cnfg.CONFIG_PREDICTOR_TANK,
+            cnfg.CONFIG_PREDICTOR_PIPE,
+            self.tank_model.get_params(),
+            self.pipe_model.get_params(),
+            model=predictor_choice,
         )
         
         # 4. Отрисовка

@@ -1,37 +1,6 @@
 # pressure_predictor_lite.py 
 import numpy as np
 
-# def apply_analytic_model(df_logs, df_registry, CONFIG_PREDICTOR, flat_params):
-#     # 1. Извлекаем данные
-#     times = df_logs[CONFIG_PREDICTOR['col_time']].values
-#     targets = df_logs[CONFIG_PREDICTOR['col_target']].values
-    
-#     predictions = []
-#     p_current = 0.0
-#     dt = 0.2 
-    
-#     for i in range(len(times)):
-
-#         # k_gain = (flat_params['k_gain']*p_current)+flat_params['b_gain']
-#         target = _get_delayed_target(i, times, targets, flat_params['dead_time'])
-#         # ШАГ 4: Пересчитываем физику
-#         p_current = predict_pressure(
-#             p_current, 
-#             target, # Подаем реальную уставку (без задержки) для проверки потенциала модели
-#             dt, 
-#             flat_params['damping'], 
-#             flat_params['k_gain'], 
-#             flat_params['b_gain'], 
-#         )
-#         predictions.append(p_current)
-        
-#         dt = times[i] - times[i-1]
-
-#     df_logs[CONFIG_PREDICTOR['col_result']] = predictions
-
-#     df_logs, df_registry = _calculate_and_save_errors(df_logs, df_registry, CONFIG_PREDICTOR)
-#     return df_logs, df_registry
-
 def apply_analytic_model(df_logs, df_registry, CONFIG_PREDICTOR, flat_params):
     # 1. Извлекаем данные
     time_grid = df_logs[CONFIG_PREDICTOR['col_time']].values
