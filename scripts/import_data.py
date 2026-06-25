@@ -67,47 +67,7 @@ def _extract_cycles(df, filename, settings, ts_cols, reg_cols):
                 
     return detected_ts, detected_reg
 
-# def _extract_cycles(df, filename, settings, ts_cols, reg_cols):
-#     """
-#     settings: словарь с триггерами
-#     ts_cols, reg_cols: списки колонок
-#     """
-#     detected_ts, detected_reg = [], []
-#     t_open = settings['trigger_open']
-#     t_close = settings['trigger_close']
-#     time_col = settings['time_col']
-
-#     starts = df.index[(df[t_open].shift(1) == 0) & (df[t_open] == 1)].tolist()
-    
-#     for start_idx in starts:
-#         t_start = df.loc[start_idx, time_col]
-#         future_data = df.loc[start_idx : start_idx + 2000]
-#         closes = future_data.index[(future_data[t_close].shift(1) == 0) & (future_data[t_close] == 1)].tolist()
-        
-#         if closes:
-#             duration = (df.loc[closes[0], time_col] - t_start).total_seconds()
-#             if 0 < duration <= settings["MAX_ALLOWED_DURATION"]:
-#                 c_id = f"{filename}_{t_start.strftime('%Y%m%d_%H%M%S')}"
-                
-#                 # Реестр
-#                 reg_entry = df.loc[start_idx, reg_cols].to_dict()
-#                 reg_entry.update({"cycle_id": c_id, "cycle_start_time": t_start, "duration": duration})
-#                 detected_reg.append(reg_entry)
-                
-#                 # Логи
-#                 mask = (df[time_col] >= t_start - timedelta(seconds=settings['t_before'])) & \
-#                        (df[time_col] <= t_start + timedelta(seconds=settings['t_after']))
-                
-#                 cycle_slice = df.loc[mask].copy()
-#                 cycle_slice['t_relative'] = (cycle_slice[time_col] - t_start).dt.total_seconds()
-#                 cycle_slice['cycle_id'] = c_id
-                
-#                 cols_to_keep = ["cycle_id", "t_relative"] + [c for c in ts_cols if c in cycle_slice.columns]
-#                 detected_ts.append(cycle_slice[cols_to_keep])
-                
-#     return detected_ts, detected_reg
-
-def run_extraction(raw_dir, logs_file, reg_file, settings, col_config):
+def run_extraction(raw_dir, settings, col_config):
     """
     Выполняет экстракцию данных.
     Возвращает: (df_logs, df_registryistry) или (None, None) при отсутствии данных.
@@ -134,11 +94,7 @@ def run_extraction(raw_dir, logs_file, reg_file, settings, col_config):
         df_logs["LD31W.VALVE 1007 - клапан бака, бар"]*=10
         df_logs["LD31W.VALVE 1008 - клапан трубы, бар"]*=10
         df_logs["LD31W.VALVE 1019 - клапан спирали, бар"]*=10
-        
-        # 2. Сохраняем их на диск (для будущих сессий)
-        df_logs.to_csv(logs_file, index=False, sep=';')
-        df_registry.to_csv(reg_file, index=False, sep=';')
-        
+              
         print(f"Экстракция завершена. Обработано {len(df_registry)} циклов.")
         
         # 3. Возвращаем их пользователю для немедленной работы

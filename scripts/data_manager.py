@@ -52,10 +52,10 @@ def remove_cycles_from_data(df_logs, df_registry, cycle_ids, col_cycle='cycle_id
         cycle_ids = [cycle_ids]
 
     # Удаляем из логов: оставляем те строки, id которых НЕ ВХОДИТ (~) в список cycle_ids
-    df_logs = df_logs[~df_logs[col_cycle].isin(cycle_ids)].copy()
+    df_logs = df_logs[~df_logs[col_cycle].isin(cycle_ids)].copy().reset_index(drop=True)
     
     # Удаляем из регистра
-    df_registry = df_registry[~df_registry[col_cycle].isin(cycle_ids)].copy()
+    df_registry = df_registry[~df_registry[col_cycle].isin(cycle_ids)].copy().reset_index(drop=True)
 
     
     return df_logs, df_registry
@@ -282,11 +282,11 @@ def load_config(file_path):
         print(f"Ошибка чтения JSON: {e}")
         return None, None
 
-def get_flat_params(config_dict):
+def get_flat_params(config_params):
     """Вытаскивает только 'value' из структуры конфига."""
     # Обработка случая, если конфиг уже плоский или имеет структуру {key: {value: X}}
     flat_params = {}
-    for k, v in config_dict.items():
+    for k, v in config_params.items():
         if isinstance(v, dict) and 'value' in v:
             flat_params[k] = v['value']
         else:
