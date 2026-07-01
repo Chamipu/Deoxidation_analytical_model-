@@ -13,6 +13,8 @@ from pathlib import Path
 # =============================================================================
 
 def _get_cycle_ids(df_registry, identifiers):
+    #  эта функция ищет cycle_id по любому из идентификаторов: case_tag, cycle_start_time, cycle_id
+    #   1. Если передан список, ищем по всем элементам
     ids = identifiers if isinstance(identifiers, list) else [identifiers]
     cols = [c for c in ['cycle_id', 'case_tag', 'cycle_start_time'] if c in df_registry.columns]
     

@@ -103,30 +103,24 @@ class SimulationTab(ttk.Frame):
     def update_view(self, *args):
         # 1. Синхронизация осей
         for ax, v in self.axis_ui.items():
-            try: self.state.gui_config["axis_limits"].update({
-                f"{ax}_min": float(v["min"].get()), f"{ax}_max": float(v["max"].get()), f"{ax}_fix": v["fix"].get()
-            })
-            except: pass
+            try: 
+                self.state.gui_config["axis_limits"].update({
+                    f"{ax}_min": float(v["min"].get()), 
+                    f"{ax}_max": float(v["max"].get()), 
+                    f"{ax}_fix": v["fix"].get()
+                })
+            except (ValueError, KeyError): 
+                pass
         
         # 2. Синхронизация маркеров и датчиков
         self.state.gui_config["markers"] = {k: v.get_settings() for k, v in self.marker_ctrls.items()}
-        for sc in self.sensor_ctrls: self.state.gui_config["sensors"][sc.sensor_name] = sc.get_settings()
+        for sc in self.sensor_ctrls: 
+            self.state.gui_config["sensors"][sc.sensor_name] = sc.get_settings()
 
-        # # 3. РАСЧЕТ МОДЕЛЕЙ
-        # # Прогноз БАКА
-        # self.state.df_logs, _ = prm.apply_analytic_model(
-        #     self.state.df_logs, self.state.df_registry, 
-        #     cnfg.CONFIG_PREDICTOR_TANK, self.tank_model.get_params()
-        # )
-        # # Прогноз ТРУБЫ
-        # self.state.df_logs, _ = prm.apply_analytic_model(
-        #     self.state.df_logs, self.state.df_registry, 
-        #     cnfg.CONFIG_PREDICTOR_PIPE, self.pipe_model.get_params()
-        # )
-
-        # 3. РАСЧЕТ МОДЕЛЕЙ
-        # Apply predictor: 'independent' (legacy) or 'coupled'.
-        predictor_choice = self.state.gui_config.get("predictor", "independent")
+        # 3. РАСЧЕТ МОДЕЛЕЙ (Вызов диспетчера mm)
+        # Если в конфигурации не задан тип, по умолчанию используется "coupled"
+        predictor_choice = self.state.gui_config.get("predictor", "coupled")
+        
         self.state.df_logs, self.state.df_registry = mm.apply_model(
             self.state.df_logs,
             self.state.df_registry,

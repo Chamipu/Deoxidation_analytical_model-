@@ -143,7 +143,7 @@ CONFIG_PREDICTOR_TANK = {
     'col_cycle': 'cycle_id',
 
     'col_target': 'p_tank_target_rounded',          # Прогноз по округленному значению
-    # 'col_target_tank': 'p_tank_target',           # Прогноз по значению с пульта
+    # 'col_target': 'p_tank_target',           # Прогноз по значению с пульта
     'col_result': 'p_tank_theory',
     'col_MAE': 'MAE_tank',
     'col_actual': 'IBA_DB\PT1009 Актуальное давление в баке P1 (бар)_median'
@@ -155,7 +155,7 @@ CONFIG_PREDICTOR_PIPE = {
     'col_cycle': 'cycle_id',
 
     'col_target': 'p_pipe_target_rounded',          # Прогноз по округленному значению
-    # 'col_target_pipe': 'p_pipe_target',           # Прогноз по значению с пульта
+    # 'col_target': 'p_pipe_target',           # Прогноз по значению с пульта
     'col_result': 'p_pipe_theory',
     'col_MAE': 'MAE_pipe',
     'col_actual': 'IBA_DB\PT1014 Актуальное давление в трубе (бар)_median'

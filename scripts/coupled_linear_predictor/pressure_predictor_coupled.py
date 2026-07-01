@@ -6,7 +6,7 @@ import pandas as pd
 # БЛОК 1: ДИСКУРС С PANDAS (БЕЗ ДУБЛИРОВАНИЯ)
 # =============================================================================
 
-def apply_coupled_model(df_logs, df_registry, CONFIG_TANK, CONFIG_PIPE, flat_params_tank, flat_params_pipe):
+def _apply_coupled_model(df_logs, df_registry, CONFIG_TANK, CONFIG_PIPE, flat_params_tank, flat_params_pipe):
     """
     Оркестратор: только запускает расчет давлений. Ошибки рассчитываются на выходе.
     """
@@ -17,48 +17,48 @@ def apply_coupled_model(df_logs, df_registry, CONFIG_TANK, CONFIG_PIPE, flat_par
     # Раскладываем датафрейм на отдельные наборы по цикл айди
     grouped = df_logs.groupby(cycle_col)
     
+    # Создаем словарь соответствия: ID цикла -> длительность (duration)
+    duration_map = df_registry.set_index(cycle_col)['duration'].dropna().to_dict()
+
     # 1. Расчет физики
     # Цикл итерируется по этим стопкам
     for cycle_id, df_cycle in grouped:
         # Извлечение оригинальных индексов строк по cycle_id для сопоставления результатов в массивы
         indices = df_cycle.index.values
         
+        cycle_duration = duration_map[cycle_id]
+
         # передаем чисто массивы за счет .values
         p_tank_pred, p_pipe_pred = solve_coupled_system(
             times=df_cycle[CONFIG_TANK['col_time']].values,
             target_tank=df_cycle[CONFIG_TANK['col_target']].values,
             target_pipe=df_cycle[CONFIG_PIPE['col_target']].values,
             flat_params_tank=flat_params_tank,
-            flat_params_pipe=flat_params_pipe
+            flat_params_pipe=flat_params_pipe,
         )
         
         p_tank_results[indices] = p_tank_pred
         p_pipe_results[indices] = p_pipe_pred
 
     # 3. Запись результатов и расчет всех ошибок (в один проход для каждого канала)
-    _finalize_channel_data(df_logs, df_registry, CONFIG_TANK, p_tank_results)
-    _finalize_channel_data(df_logs, df_registry, CONFIG_PIPE, p_pipe_results)
+    _finalize_channel_data(df_logs, df_registry, CONFIG_TANK, p_tank_results, duration_map)
+    _finalize_channel_data(df_logs, df_registry, CONFIG_PIPE, p_pipe_results, duration_map)
 
     return df_logs, df_registry   
 
-def _finalize_channel_data(df_logs, df_registry, CONFIG, predicted_results):
-    """
-    Элегантный расчет всех типов ошибок в 4 строчки кода средствами Pandas.
-    """
-    col_actual = CONFIG['col_actual']
-
-    # Записываем прогноз теории в логи
+def _finalize_channel_data(df_logs, df_registry, CONFIG, predicted_results, duration_map):
+    col_cycle, col_time = CONFIG['col_cycle'], CONFIG['col_time']
+    
+    # 1. Записываем прогноз и вычисляем построчную ошибку
     df_logs[CONFIG['col_result']] = predicted_results
+    df_logs[CONFIG['col_MAE']] = (df_logs[CONFIG['col_actual']] - predicted_results).abs()
     
-    # Расчет 1: Построчная абсолютная ошибка для каждой миллисекунды
-    df_logs[CONFIG['col_MAE']] = (df_logs[col_actual] - predicted_results).abs()
+    # 2. Фильтруем интервал [0.0, duration] на лету через .map()
+    active_logs = df_logs[(df_logs[col_time] >= 0.0) & (df_logs[col_time] <= df_logs[col_cycle].map(duration_map))]
     
-    # Расчет 2: Средняя ошибка MAE за цикл строго на интервале времени [3.0, 7.0] секунд
-    active_logs = df_logs[(df_logs[CONFIG['col_time']] >= 3.0) & (df_logs[CONFIG['col_time']] <= 7.0)]
-    cycle_mae_series = active_logs.groupby(CONFIG['col_cycle'])[CONFIG['col_MAE']].mean()
-    
-    # Записываем MAE цикла в реестр
-    df_registry[CONFIG['col_MAE']] = df_registry[CONFIG['col_cycle']].map(cycle_mae_series)
+    # 3. Группируем и переносим среднюю ошибку цикла в реестр
+    cycle_mae_series = active_logs.groupby(col_cycle)[CONFIG['col_MAE']].mean()
+    df_registry[CONFIG['col_MAE']] = df_registry[col_cycle].map(cycle_mae_series)
 
 
 # =============================================================================
@@ -76,10 +76,10 @@ def solve_coupled_system(times, target_tank, target_pipe, flat_params_tank, flat
     
     # заполняем график давления до 0с заполняя его статическим преднадувом, рассчитанным по линейной зависимости
     for i in range(idx_t0):
-        p_tank_pred[i] = calculate_static_precharge(target_tank[i])
-        p_pipe_pred[i] = calculate_static_precharge(target_pipe[i])
+        p_tank_pred[i] = _calculate_static_precharge(target_tank[i])
+        p_pipe_pred[i] = _calculate_static_precharge(target_pipe[i])
 
-    p_tank_pred[idx_t0] = calculate_static_precharge(target_tank[idx_t0])
+    p_tank_pred[idx_t0] = _calculate_static_precharge(target_tank[idx_t0])
     p_pipe_pred[idx_t0] = 0
 
     p_tank_current = p_tank_pred[idx_t0]
@@ -89,8 +89,8 @@ def solve_coupled_system(times, target_tank, target_pipe, flat_params_tank, flat
 
     for i in range(idx_t0+1, n_steps):
 
-        target_t_delayed = get_delayed_value(times, target_tank, times[i] - flat_params_tank['dead_time'], i)
-        target_p_delayed = get_delayed_value(times, target_pipe, times[i] - flat_params_pipe['dead_time'], i)
+        target_t_delayed = _get_delayed_value(times, target_tank, times[i] - flat_params_tank['dead_time'], i)
+        target_p_delayed = _get_delayed_value(times, target_pipe, times[i] - flat_params_pipe['dead_time'], i)
 
         delta_p = p_tank_current - p_pipe_current
 
@@ -98,7 +98,7 @@ def solve_coupled_system(times, target_tank, target_pipe, flat_params_tank, flat
         coupling_term_pipe = + flat_params_pipe['sigma_in'] * delta_p
 
         # Мы сознательно сохраняем параллельную структуру для наглядности ОДУ
-        p_tank_next = solve_first_order_step(
+        p_tank_next = _solve_first_order_step(
             p_prev=p_tank_current,
             target_p=target_t_delayed,
             dt=dt,
@@ -108,7 +108,7 @@ def solve_coupled_system(times, target_tank, target_pipe, flat_params_tank, flat
             coupling_term=coupling_term_tank
         )
 
-        p_pipe_next = solve_first_order_step(
+        p_pipe_next = _solve_first_order_step(
             p_prev=p_pipe_current,
             target_p=target_p_delayed,
             dt=dt,
@@ -131,13 +131,13 @@ def solve_coupled_system(times, target_tank, target_pipe, flat_params_tank, flat
 # БЛОК 3: ФИЗИКА И МАТЕМАТИКА (ПОЛНОСТЬЮ ОБОСОБЛЕНА)
 # =============================================================================
 
-def solve_first_order_step(p_prev, target_p, dt, damping, k_gain, b_gain, coupling_term):
+def _solve_first_order_step(p_prev, target_p, dt, damping, k_gain, b_gain, coupling_term):
     k_gain_base = k_gain * p_prev + b_gain
     dp_dt = (1.0 / damping) * (k_gain_base * target_p - p_prev) + coupling_term
     return p_prev + dp_dt * dt
 
 
-def calculate_static_precharge(target, slope=0.1, intercept=-0.23):
+def _calculate_static_precharge(target, slope=0.1, intercept=-0.23):
     """
     Расчет установившегося давления преднадува по линейной зависимости.
     Построено по точкам: (Сигнал 3.0 -> 0.07 бар) и (Сигнал 4.0 -> 0.17 бар).
@@ -151,7 +151,7 @@ def calculate_static_precharge(target, slope=0.1, intercept=-0.23):
     return max(0.0, p_static)
 
 
-def get_delayed_value(times, targets, target_time, current_idx):
+def _get_delayed_value(times, targets, target_time, current_idx):
     if target_time <= times[0]:
         return targets[0]
     start_idx = max(0, current_idx - 20)
@@ -159,11 +159,11 @@ def get_delayed_value(times, targets, target_time, current_idx):
     return np.interp(target_time, times[start_idx:end_idx], targets[start_idx:end_idx])
 
 
-def calculate_absolute_errors(actual_array, predicted_array):
+def _calculate_absolute_errors(actual_array, predicted_array):
     return np.abs(actual_array - predicted_array)
 
 
-def calculate_interval_mae(times, actual_array, predicted_array, t_min=3.0, t_max=7.0):
+def _calculate_interval_mae(times, actual_array, predicted_array, t_min=3.0, t_max=7.0):
     mask = (times >= t_min) & (times <= t_max)
     if not np.any(mask):
         return np.nan

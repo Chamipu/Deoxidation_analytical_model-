@@ -13,7 +13,8 @@ import config as cnfg
 import config_paths as cnfg_p
 from gui.widgets import PhysicsModelBlock, COLOR_LIST, STYLE_LIST
 from scripts import data_manager as dm
-from scripts.independent_linear_predictor import inverse_predictorrrr as inv
+# from scripts.independent_linear_predictor import inverse_predictorrrr as inv
+from scripts.coupled_linear_predictor import invers_coupled as inv
 
 
 class OptPlotter:
@@ -143,6 +144,7 @@ class OptimizationTab(ttk.Frame):
         self.sliders_container = ttk.Frame(f_pts)
         self.sliders_container.pack(fill="x")
 
+        # Модель Бака
         self.tank_model = PhysicsModelBlock(
             self.scroll_f,
             "ФИЗИКА СИСТЕМЫ (ПАРАМЕТРЫ БАКА)",
@@ -150,6 +152,15 @@ class OptimizationTab(ttk.Frame):
             self.update_raw_preview,
         )
         self.tank_model.pack(fill="x", pady=5)
+
+        # ДОБАВЛЕНО: Модель Трубы (необходима для связанной модели)
+        self.pipe_model = PhysicsModelBlock(
+            self.scroll_f,
+            "ФИЗИКА СИСТЕМЫ (ПАРАМЕТРЫ ТРУБЫ)",
+            cnfg_p.DEFAULT_MODEL_PARAMS_PIPE_FILE,
+            self.update_raw_preview,
+        )
+        self.pipe_model.pack(fill="x", pady=5)
 
         f_action = ttk.LabelFrame(self.scroll_f, text=" ПАРАМЕТРЫ ПОДБОРА ", padding=8)
         f_action.pack(fill="x", pady=5)
@@ -178,7 +189,6 @@ class OptimizationTab(ttk.Frame):
         f_plot = ttk.LabelFrame(self.scroll_f, text=" НАСТРОЙКИ ГРАФИКА ", padding=8)
         f_plot.pack(fill="x", pady=5)
 
-        # Ensure plots config exists
         if "plots" not in self.state.gui_config:
             self.state.gui_config["plots"] = {}
 
@@ -351,11 +361,15 @@ class OptimizationTab(ttk.Frame):
         sys.stdout = StdoutRedirector(self.log_text)
 
         presets = self.get_current_presets()
-        flat_params = self.tank_model.get_params()
+        
+        # Получаем параметры для обоих каналов
+        flat_params_tank = self.tank_model.get_params()
+        flat_params_pipe = self.pipe_model.get_params()
 
+        # Запуск потока с передачей обоих наборов параметров
         self.opt_thread = threading.Thread(
             target=self._run_optimization_process,
-            args=(presets, duration, flat_params),
+            args=(presets, duration, flat_params_tank, flat_params_pipe),
             daemon=True,
         )
         self.opt_thread.start()

@@ -6,6 +6,7 @@ from scripts import data_manager as dm
 from gui.tabs.sim_tab import SimulationTab
 from gui.tabs.optimization_tab import OptimizationTab
 
+
 class AppState:
     def __init__(self):
         self.df_logs = dm.load_database(cnfg_p.LOGS_AVG_FILE)
